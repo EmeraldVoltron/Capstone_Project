@@ -4,9 +4,11 @@ module.exports = {
     info: {
       title: 'Budget API',
       version: '1.0.0',
-      description: 'Tracks transactions & categories'
+      description: 'Tracks transactions & categories',
     },
-    servers: [{ url: `${process.env.SERVER_URL}/api/v1` }]
+    servers: [
+      { url: process.env.SERVER_URL || 'http://localhost:5000' }
+    ],
   },
-  apis: ['./routes/*.js']  // JSDoc in your route files
+  apis: ['./routes/*.js'],  // all JSDoc scanned here
 };

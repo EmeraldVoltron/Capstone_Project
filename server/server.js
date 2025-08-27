@@ -1,5 +1,6 @@
+
 require("dotenv").config();
-const express = require("express");
+
 const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -10,23 +11,31 @@ const swaggerUi = require("swagger-ui-express");
 const options = require("./swaggerOptions");
 const specs = swaggerJsDoc(options);
 
+const express = require("express");
+const path = require("path");
 const app = express();
 
 const plaidRoutes = require("./routes/Plaidroutes");
 const apiRoutes = require("./routes/index"); // transactions, categories, etc.
 const budgetRoutes = require("./routes/budget");
 const cardRoutes = require("./routes/cardRoutes");
+const authRoutes = require("./routes/authRoutes");
+const debtRoutes = require("./routes/debtRoutes");
+const savingsRoutes = require("./routes/savingsRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
+const transactionRoutes = require("./routes/transactionRoutes");
 
 // Trust proxy if behind one
 app.set("trust proxy", 1);
 
+// --- MIDDLEWARES ---
 // JSON body parser
 app.use(express.json());
-
 // Security headers
 app.use(helmet());
 
-// CORS — single, consistent config
+
+
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
@@ -72,7 +81,7 @@ app.post("/api/items", async (req, res) => {
 app.use("/api/v1/plaid", plaidRoutes);
 
 // Auth routes (no authentication required)
-const authRoutes = require("./routes/authRoutes");
+
 app.use("/api/v1/auth", authRoutes);
 
 // Mount the cards router under the API namespace (FIX)
@@ -83,18 +92,10 @@ app.use("/api/v1/cards", cardRoutes);
 app.use("/api/v1", apiRoutes);
 
 // Category routes:
-const debtRoutes = require("./routes/debtRoutes");
 app.use("/api/v1/debts", debtRoutes);
-
-const savingsRoutes = require("./routes/savingsRoutes");
 app.use("/api/v1/savings", savingsRoutes);
-
-const categoryRoutes = require("./routes/categoryRoutes");
 app.use("/api/v1/categories", categoryRoutes);
-
-const transactionRoutes = require("./routes/transactionRoutes");
 app.use("/api/v1/transactions", transactionRoutes);
-
 // Budget route
 app.use("/api/v1/budget", budgetRoutes);
 
@@ -110,6 +111,28 @@ app.get("/api/v1", (req, res) => {
     },
   });
 });
+
+// --- SERVE FRONTEND IN PRODUCTION ---
+// app.use(express.static(path.join(__dirname, "client/dist")));
+if (process.env.NODE_ENV === 'production') {
+  const express = require('express');
+  const path = require('path');
+
+  // Serve static frontend files
+  app.use(express.static(path.join(__dirname, 'client', 'dist')));
+
+  // Catch-all route to serve index.html
+  app.get('*', (req, res) => {
+    const indexPath = path.resolve(__dirname, 'client', 'dist', 'index.html');
+    res.sendFile(indexPath, err => {
+      if (err) {
+        console.error('Error sending index.html:', err);
+        res.status(500).send('Server error');
+      }
+    });
+  });
+}
+
 
 // centralized error handler
 app.use((err, req, res, next) => {
