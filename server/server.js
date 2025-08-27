@@ -1,20 +1,33 @@
 
+// const rateLimit = require("express-rate-limit");
+// const logger = require("./config/logger");
+
+// const path = require("path");
+
+// // Trust proxy if behind one
+// // app.set("trust proxy", 1);
+
+// // Basic rate limiter (optional)
+// // app.use(rateLimit({
+// //   windowMs: 15 * 60 * 1000,
+// //   max: 250,
+// //   message: "Too many requests from this IP, please try again later."
+// // }))
+
 require("dotenv").config();
 
-const mongoose = require("mongoose");
-const cors = require("cors");
+const express = require("express");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
-const logger = require("./config/logger");
+const cors = require("cors");
+const mongoose = require("mongoose");
+const path = require("path");
+
 const swaggerJsDoc = require("swagger-jsdoc");
 const swaggerUi = require("swagger-ui-express");
 const options = require("./swaggerOptions");
 const specs = swaggerJsDoc(options);
 
-const express = require("express");
-const path = require("path");
-const app = express();
-
+//routes:
 const plaidRoutes = require("./routes/Plaidroutes");
 const apiRoutes = require("./routes/index"); // transactions, categories, etc.
 const budgetRoutes = require("./routes/budget");
@@ -25,17 +38,13 @@ const savingsRoutes = require("./routes/savingsRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const transactionRoutes = require("./routes/transactionRoutes");
 
-// Trust proxy if behind one
-app.set("trust proxy", 1);
+const app = express();
 
-// --- MIDDLEWARES ---
-// JSON body parser
+// middleware
 app.use(express.json());
 // Security headers
 app.use(helmet());
-
-
-
+// CORS 
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
@@ -43,61 +52,32 @@ app.use(
   })
 );
 
-// Basic rate limiter (optional)
-// app.use(rateLimit({
-//   windowMs: 15 * 60 * 1000,
-//   max: 250,
-//   message: "Too many requests from this IP, please try again later."
-// }))
-
-// HEALTH
-app.get("/", (req, res) => {
-  res.send(" Cache Budget API is running! ");
-});
-
-// Swagger
-app.use("/api/v1/docs", swaggerUi.serve, swaggerUi.setup(specs));
-
 // --- Connect to MongoDB ---
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error(err));
 
-// Demo test model/routes (left as-is)
-const itemSchema = new mongoose.Schema({ name: String });
-const Item = mongoose.model("Item", itemSchema);
+//Swagger
+app.use("/api/v1/docs", swaggerUi.serve, swaggerUi.setup(specs));
 
-app.get("/api/hello", (req, res) => {
-  res.json({ message: "Hello from the backend API!" });
-});
-
-app.post("/api/items", async (req, res) => {
-  const newItem = await Item.create(req.body);
-  res.status(201).json(newItem);
-});
-
-// --- REAL API ROUTES ---
+//Routes
 app.use("/api/v1/plaid", plaidRoutes);
-
-// Auth routes (no authentication required)
-
-app.use("/api/v1/auth", authRoutes);
-
-// Mount the cards router under the API namespace (FIX)
-// ❌ was: app.use("/dashboard/cardManagement", cardRoutes);
-app.use("/api/v1/cards", cardRoutes);
-
-// Aggregated routes (categories, transactions, etc.)
 app.use("/api/v1", apiRoutes);
-
-// Category routes:
+app.use("/api/v1/budget", budgetRoutes);
+app.use("/api/v1/cards", cardRoutes);
 app.use("/api/v1/debts", debtRoutes);
 app.use("/api/v1/savings", savingsRoutes);
 app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/transactions", transactionRoutes);
-// Budget route
-app.use("/api/v1/budget", budgetRoutes);
+
+// Auth routes
+app.use("/api/v1/auth", authRoutes);
+
+// HEALTH
+app.get("/", (req, res) => {
+  res.send(" Cache Budget API is running! ");
+});
 
 // Version info
 app.get("/api/v1", (req, res) => {
@@ -113,11 +93,8 @@ app.get("/api/v1", (req, res) => {
 });
 
 // --- SERVE FRONTEND IN PRODUCTION ---
-// app.use(express.static(path.join(__dirname, "client/dist")));
+app.use(express.static(path.join(__dirname, "client/dist")));
 if (process.env.NODE_ENV === 'production') {
-  const express = require('express');
-  const path = require('path');
-
   // Serve static frontend files
   app.use(express.static(path.join(__dirname, 'client', 'dist')));
 
@@ -133,8 +110,7 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-
-// centralized error handler
+//centralized error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: err.message || "Something went wrong." });
